@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Particle Word Swarm</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #02021a; /* Dark Blue */
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+        }
+
+        #canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #ui-container {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            z-index: 10;
+            background: rgba(0, 0, 50, 0.85); /* Slightly darker for better contrast */
+            padding: 15px 30px;
+            border-radius: 20px;
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(0, 255, 255, 0.15);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6), inset 0 0 20px rgba(0, 255, 255, 0.05);
+            width: 90vw; /* Wide menu */
+            max-width: 1400px;
+        }
+
+        /* Top Row: Input and Submit */
+        .input-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+        }
+
+        input[type="text"] {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(0, 170, 255, 0.5);
+            border-radius: 10px;
+            color: #e0f7ff;
+            font-size: 16px;
+            padding: 10px 20px;
+            outline: none;
+            flex: 1; /* Take remaining width */
+            text-align: center;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        input[type="text"]:focus {
+            border-color: #00aaff;
+            box-shadow: 0 0 15px rgba(0, 170, 255, 0.3);
+            background: rgba(0, 0, 0, 0.6);
+        }
+
+        /* Bottom Row: All Controls in one line */
+        .controls-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+            width: 100%;
+            flex-wrap: wrap; /* Allow wrapping on very small screens */
+        }
+
+        /* Separator lines between groups */
+        .separator {
+            width: 1px;
+            height: 30px;
+            background: rgba(0, 255, 255, 0.15);
+            margin: 0 5px;
+        }
+
+        /* Grouping logic for flex layout */
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Icons */
+        .icon {
+            width: 20px;
+            height: 20px;
+            stroke: #00aaff;
+            stroke-width: 2;
+            fill: none;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        /* Sliders */
+        .slider-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 80px; /* Slightly tighter to fit everything */
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        /* Color Slider Gradient */
+        #hueSlider {
+            background: linear-gradient(to right, 
+                hsl(0, 100%, 50%), 
+                hsl(60, 100%, 50%), 
+                hsl(120, 100%, 50%), 
+                hsl(180, 100%, 50%), 
+                hsl(240, 100%, 50%), 
+                hsl(300, 100%, 50%), 
+                hsl(360, 100%, 50%)
+            );
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            background: #fff;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            transition: transform 0.1s;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        /* Number Inputs */
+        .number-group {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            background: rgba(0,0,0,0.3);
+            padding: 4px 8px;
+            border-radius: 8px;
+            border: 1px solid rgba(0, 255, 255, 0.1);
+        }
+
+        .number-label {
+            font-size: 10px;
+            color: #00aaff;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        input[type="number"] {
+            background: transparent;
+            border: none;
+            color: white;
+            width: 45px;
+            text-align: center;
+            font-size: 12px;
+            outline: none;
+            -moz-appearance: textfield;
+        }
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        /* Buttons & Toggles */
+        .icon-btn {
+            background: rgba(0, 170, 255, 0.1);
+            border: 1px solid rgba(0, 170, 255, 0.3);
+            color: #00aaff;
+            padding: 0;
+            border-radius: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            width: 36px;
+            height: 36px;
+        }
+
+        .icon-btn:hover, .icon-btn.active {
+            background: rgba(0, 170, 255, 0.3);
+            box-shadow: 0 0 15px rgba(0, 170, 255, 0.4);
+            transform: translateY(-1px);
+            color: white;
+        }
+        
+        .icon-btn.active .icon {
+            stroke: white;
+        }
+
+        /* Main Submit Button (Icon only) */
+        .main-btn {
+            background: linear-gradient(135deg, #0088cc, #005588);
+            border: none;
+            color: white;
+            width: 42px; /* Match input height roughly */
+            height: 42px;
+            border-radius: 10px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0, 136, 204, 0.3);
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .main-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 136, 204, 0.5);
+            background: linear-gradient(135deg, #0099dd, #006699);
+        }
+
+        .main-btn:active {
+            transform: translateY(0);
+        }
+
+        #audioInput { display: none; }
+
+        /* Tooltip style */
+        [title]:hover::after {
+            content: attr(title);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            white-space: nowrap;
+            margin-bottom: 8px;
+            pointer-events: none;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="canvas"></canvas>
+
+    <div id="ui-container">
+        <!-- Row 1: Input Field and Submit Button -->
+        <div class="input-row">
+            <input type="text" id="textInput" placeholder="Enter sentence..." maxlength="50" value="HELLO WORLD">
+            <button id="submitBtn" class="main-btn" title="Form Particles">
+                <svg class="icon" style="stroke: white; width: 24px; height: 24px;" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+            </button>
+        </div>
+        
+        <!-- Row 2: All Controls in one line -->
+        <div class="controls-row">
+            
+            <div class="control-group">
+                <!-- Particle Counts -->
+                <div class="number-group" title="Base Particles">
+                    <svg class="icon" viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"></circle><circle cx="5" cy="21" r="1"></circle><circle cx="1" cy="21" r="1"></circle><circle cx="12" cy="7" r="4"></circle><circle cx="12" cy="3" r="1"></circle><path d="M12 11v10"></path></svg>
+                    <span class="number-label">Base</span>
+                    <input type="number" id="baseCountInput" value="1000" min="100" max="8000" step="100">
+                </div>
+                
+                <div class="number-group" title="Max Particles">
+                    <svg class="icon" viewBox="0 0 24 24"><path d="M12 2v20"></path><path d="M2 12h20"></path></svg>
+                    <span class="number-label">Max</span>
+                    <input type="number" id="maxCountInput" value="6000" min="500" max="15000" step="500">
+                </div>
+            </div>
+
+            <div class="control-group">
+                <!-- Music Expansion -->
+                <div class="slider-wrapper" title="Music Explosion Impact">
+                    <svg class="icon" viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                    <input type="range" id="expansionSlider" min="0" max="3.0" step="0.1" value="0.15">
+                </div>
+
+                <!-- Color -->
+                <div class="slider-wrapper" title="Particle Color">
+                    <svg class="icon" viewBox="0 0 24 24"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"></circle><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"></circle><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"></circle><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"></circle><path d="M12 22a8 8 0 0 0 8-8c0-3.31-3-8-8-8c-4.08 0-6.36 2.83-7.59 5.51C3.83 12.79 3 13.38 3 14a3 3 0 0 0 3 3h6z"></path></svg>
+                    <input type="range" id="hueSlider" min="0" max="360" step="1" value="190">
+                </div>
+            </div>
+
+            <div class="control-group">
+                <button id="randomColorBtn" class="icon-btn" title="Auto Random Color (5s)">
+                    <svg class="icon" viewBox="0 0 24 24"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>
+                </button>
+
+                <div class="separator"></div>
+
+                <!-- Toggles & Audio -->
+                <button id="followCursorBtn" class="icon-btn active" title="Follow Cursor">
+                    <svg class="icon" viewBox="0 0 24 24"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"></path><path d="M13 13l6 6"></path></svg>
+                </button>
+
+                <label for="audioInput" class="icon-btn" title="Upload Music">
+                    <svg class="icon" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+                </label>
+                <input type="file" id="audioInput" accept="audio/*">
+                
+                <button id="pauseBtn" class="icon-btn" style="display:none;" title="Play/Pause">
+                    <svg class="icon" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden audio element for playback -->
+    <audio id="audioPlayer"></audio>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const input = document.getElementById('textInput');
+        const btn = document.getElementById('submitBtn');
+        const audioInput = document.getElementById('audioInput');
+        const audioPlayer = document.getElementById('audioPlayer');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const expansionSlider = document.getElementById('expansionSlider');
+        const hueSlider = document.getElementById('hueSlider');
+        const randomColorBtn = document.getElementById('randomColorBtn');
+        const baseCountInput = document.getElementById('baseCountInput');
+        const maxCountInput = document.getElementById('maxCountInput');
+        const followCursorBtn = document.getElementById('followCursorBtn');
+
+        let width, height;
+        let particles = [];
+        let stars = []; // For background effect
+        let mouse = { x: 0, y: 0 };
+        let isMouseActive = false;
+        
+        // Audio Variables
+        let audioContext;
+        let analyser;
+        let audioSource;
+        let pulseFactor = 1; 
+        
+        // Configuration
+        // RESOLUTION SETTING: 5 is a good balance. 
+        // Lower = sharper text but more particles (heavier).
+        // Higher = blocky text but faster.
+        const DEFAULT_DENSITY = 5; 
+        const FORMING_SPEED = 0.15;
+        
+        // Dynamic Config
+        let baseParticleCount = 1000; 
+        let maxParticleCount = 6000; 
+        let shouldFollowCursor = true;
+        let currentHue = 190; // Default cyan/light blue
+        let isRandomColor = false;
+        
+        // State
+        let targetPoints = [];
+        let state = 'idle'; // idle, forming, holding, exploding
+        
+        // Sequence Management
+        let wordQueue = [];
+        let queueIndex = 0;
+        let animationTimer = null;
+        let colorInterval = null;
+
+        // Resize handling
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            if (!isMouseActive) {
+                mouse.x = width / 2;
+                mouse.y = height / 2;
+            }
+            initStars();
+        }
+        window.addEventListener('resize', resize);
+        
+        // Mouse tracking
+        window.addEventListener('mousemove', (e) => {
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+            isMouseActive = true;
+        });
+        window.addEventListener('touchmove', (e) => {
+            mouse.x = e.touches[0].clientX;
+            mouse.y = e.touches[0].clientY;
+            isMouseActive = true;
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            isMouseActive = false;
+        });
+        document.body.addEventListener('mouseleave', () => {
+            isMouseActive = false;
+        });
+
+        // --- Config Listeners ---
+
+        baseCountInput.addEventListener('change', (e) => {
+            baseParticleCount = parseInt(e.target.value);
+            adjustParticleCount();
+        });
+
+        maxCountInput.addEventListener('change', (e) => {
+            maxParticleCount = parseInt(e.target.value);
+        });
+
+        followCursorBtn.addEventListener('click', () => {
+            shouldFollowCursor = !shouldFollowCursor;
+            followCursorBtn.classList.toggle('active', shouldFollowCursor);
+        });
+
+        // Color Logic
+        hueSlider.addEventListener('input', (e) => {
+            currentHue = parseInt(e.target.value);
+        });
+
+        randomColorBtn.addEventListener('click', () => {
+            isRandomColor = !isRandomColor;
+            randomColorBtn.classList.toggle('active', isRandomColor);
+            
+            if (isRandomColor) {
+                // Start Timer
+                colorInterval = setInterval(() => {
+                    currentHue = Math.floor(Math.random() * 360);
+                    hueSlider.value = currentHue;
+                }, 5000);
+            } else {
+                clearInterval(colorInterval);
+            }
+        });
+
+
+        function adjustParticleCount() {
+            if (state !== 'idle') return;
+
+            const current = particles.length;
+            if (current < baseParticleCount) {
+                const diff = baseParticleCount - current;
+                for (let i = 0; i < diff; i++) particles.push(new Particle());
+            } else if (current > baseParticleCount) {
+                particles.splice(baseParticleCount); 
+            }
+        }
+
+        // --- Audio Setup ---
+        async function setupAudio() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256; 
+                analyser.smoothingTimeConstant = 0.1; 
+                
+                audioSource = audioContext.createMediaElementSource(audioPlayer);
+                audioSource.connect(analyser);
+                analyser.connect(audioContext.destination);
+            }
+            
+            if (audioContext.state === 'suspended') {
+                await audioContext.resume();
+            }
+        }
+
+        audioInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                await setupAudio();
+                const fileURL = URL.createObjectURL(file);
+                audioPlayer.src = fileURL;
+                audioPlayer.play();
+                
+                pauseBtn.style.display = 'flex';
+                pauseBtn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>';
+            }
+        });
+
+        pauseBtn.addEventListener('click', () => {
+            if (audioPlayer.paused) {
+                audioPlayer.play();
+                pauseBtn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>';
+            } else {
+                audioPlayer.pause();
+                pauseBtn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>';
+            }
+        });
+
+        // --- Space Background Logic ---
+        class Star {
+            constructor() {
+                this.reset();
+            }
+            
+            reset() {
+                this.x = (Math.random() - 0.5) * width * 2;
+                this.y = (Math.random() - 0.5) * height * 2;
+                this.z = Math.random() * width;
+                this.pz = this.z;
+            }
+            
+            update() {
+                // Move star closer (warp speed)
+                // Constant slow speed, independent of music
+                const speed = 2; 
+                this.z -= speed;
+                
+                if (this.z < 1) {
+                    this.reset();
+                    this.z = width;
+                    this.pz = this.z;
+                }
+            }
+            
+            draw() {
+                // Perspective projection
+                const sx = (this.x / this.z) * width/2 + width/2;
+                const sy = (this.y / this.z) * width/2 + height/2; // using width for FOV aspect consistency
+                
+                // Previous position for trail
+                const px = (this.x / this.pz) * width/2 + width/2;
+                const py = (this.y / this.pz) * width/2 + height/2;
+                
+                this.pz = this.z;
+                
+                if (sx < 0 || sx > width || sy < 0 || sy > height) return;
+
+                // Constant line width logic, removed pulseFactor
+                const r = (1 - this.z / width) * 2.5;
+                
+                ctx.beginPath();
+                ctx.moveTo(px, py);
+                ctx.lineTo(sx, sy);
+                ctx.strokeStyle = `rgba(200, 230, 255, ${1 - this.z/width})`;
+                ctx.lineWidth = r;
+                ctx.stroke();
+            }
+        }
+
+        function initStars() {
+            stars = [];
+            for(let i = 0; i < 300; i++) {
+                stars.push(new Star());
+            }
+        }
+
+        class Particle {
+            constructor() {
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                this.vx = (Math.random() - 0.5) * 2;
+                this.vy = (Math.random() - 0.5) * 2;
+                
+                this.targetX = null;
+                this.targetY = null;
+                
+                this.size = Math.random() * 2 + 1;
+                
+                this.blinkSpeed = 0.05 + Math.random() * 0.1;
+                this.blinkOffset = Math.random() * Math.PI * 2;
+                this.alpha = 1;
+
+                this.moveDelay = 0; 
+                this.moveTimer = 0;
+            }
+
+            update() {
+                if (state === 'holding') {
+                    this.blinkOffset += this.blinkSpeed * 3;
+                    this.alpha = 0.4 + Math.abs(Math.sin(this.blinkOffset)) * 0.6;
+                } else {
+                    this.blinkOffset += this.blinkSpeed;
+                    this.alpha = 0.5 + Math.abs(Math.sin(this.blinkOffset)) * 0.5;
+                }
+
+                if (state === 'idle') {
+                    this.updateIdle();
+                } else if (state === 'forming' || state === 'holding') {
+                    this.updateForming();
+                } else if (state === 'exploding') {
+                    this.updateExploding();
+                }
+
+                if (state === 'idle' || state === 'exploding') {
+                    if (this.x < 0) this.x = width;
+                    if (this.x > width) this.x = 0;
+                    if (this.y < 0) this.y = height;
+                    if (this.y > height) this.y = 0;
+                }
+            }
+
+            updateIdle() {
+                let targetX, targetY;
+                
+                if (shouldFollowCursor && isMouseActive) {
+                    targetX = mouse.x;
+                    targetY = mouse.y;
+                } else {
+                    targetX = width / 2;
+                    targetY = height / 2;
+                }
+
+                const dx = targetX - this.x;
+                const dy = targetY - this.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                if (dist > 30) {
+                    this.vx += (dx / dist) * 0.2;
+                    this.vy += (dy / dist) * 0.2;
+                }
+
+                this.vx += (Math.random() - 0.5) * 0.5;
+                this.vy += (Math.random() - 0.5) * 0.5;
+                this.vx *= 0.95;
+                this.vy *= 0.95;
+
+                const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+                if (speed > 8) {
+                    this.vx = (this.vx / speed) * 8;
+                    this.vy = (this.vy / speed) * 8;
+                }
+
+                this.x += this.vx;
+                this.y += this.vy;
+            }
+
+            updateForming() {
+                if (this.targetX === null) {
+                    this.updateIdle();
+                    return;
+                }
+
+                if (this.moveTimer < this.moveDelay) {
+                    this.moveTimer++;
+                    this.updateIdle();
+                    return;
+                }
+
+                const dx = this.targetX - this.x;
+                const dy = this.targetY - this.y;
+                this.x += dx * FORMING_SPEED;
+                this.y += dy * FORMING_SPEED;
+                
+                if (state === 'holding') {
+                     this.x += (Math.random() - 0.5) * 5;
+                     this.y += (Math.random() - 0.5) * 5;
+                }
+            }
+
+            updateExploding() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vx *= 0.98;
+                this.vy *= 0.98;
+            }
+
+            draw() {
+                ctx.beginPath();
+                
+                let centerX, centerY;
+                if (state === 'idle') {
+                    if (shouldFollowCursor && isMouseActive) {
+                        centerX = mouse.x;
+                        centerY = mouse.y;
+                    } else {
+                        centerX = width / 2;
+                        centerY = height / 2;
+                    }
+                } else {
+                    centerX = width / 2;
+                    centerY = height / 2;
+                }
+
+                let currentExpansionStrength = parseFloat(expansionSlider.value);
+                if (state === 'forming' || state === 'holding') {
+                    currentExpansionStrength = 0;
+                }
+
+                const scale = 1 + (pulseFactor - 1) * currentExpansionStrength;
+                
+                const dx = this.x - centerX;
+                const dy = this.y - centerY;
+                
+                const scatterMagnitude = (pulseFactor - 1) * 100 * currentExpansionStrength;
+                const scatterX = (Math.random() - 0.5) * scatterMagnitude;
+                const scatterY = (Math.random() - 0.5) * scatterMagnitude;
+
+                const drawX = centerX + dx * scale + scatterX;
+                const drawY = centerY + dy * scale + scatterY;
+
+                ctx.arc(drawX, drawY, this.size, 0, Math.PI * 2);
+                
+                let currentAlpha = Math.min(this.alpha * (0.6 + (pulseFactor - 1) * 0.8), 1);
+                
+                ctx.fillStyle = `hsla(${currentHue}, 100%, 70%, ${currentAlpha})`;
+                
+                ctx.shadowBlur = 10 + (pulseFactor - 1) * 25;
+                ctx.shadowColor = `hsla(${currentHue}, 100%, 70%, 0.8)`;
+                
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+        }
+
+        function initParticles() {
+            particles = [];
+            for (let i = 0; i < baseParticleCount; i++) {
+                particles.push(new Particle());
+            }
+        }
+
+        // Helper to scan text pixels with a specific step (density)
+        function scanText(text, step) {
+            const offCanvas = document.createElement('canvas');
+            const offCtx = offCanvas.getContext('2d');
+            offCanvas.width = width;
+            offCanvas.height = height;
+
+            // Responsive font size
+            const fontSize = Math.min(width / (text.length * 0.6), 200); 
+            
+            offCtx.font = `bold ${fontSize}px Arial`;
+            offCtx.fillStyle = 'white';
+            offCtx.textAlign = 'center';
+            offCtx.textBaseline = 'middle';
+            
+            // Draw text HIGHER up (height / 3)
+            offCtx.fillText(text, width / 2, height / 3);
+
+            const imageData = offCtx.getImageData(0, 0, width, height).data;
+            const points = [];
+
+            for (let y = 0; y < height; y += step) {
+                for (let x = 0; x < width; x += step) {
+                    const index = (y * width + x) * 4;
+                    if (imageData[index + 3] > 128) {
+                        points.push({ x, y });
+                    }
+                }
+            }
+            return points;
+        }
+
+        function getTextCoordinates(text) {
+            // 1. Try scanning with default high quality (Density 5)
+            let points = scanText(text, DEFAULT_DENSITY);
+
+            // 2. ADAPTIVE RESOLUTION:
+            // If the text is huge and generates too many points (> maxParticleCount),
+            // we re-scan with a coarser resolution (higher step) so the WHOLE word fits,
+            // rather than cutting off the end.
+            if (points.length > maxParticleCount) {
+                // Heuristic: Estimate required density to fit in max count
+                // Ratio of points needed vs allowed
+                const ratio = points.length / maxParticleCount;
+                // Increase density step roughly by square root of ratio (since area is 2D)
+                let newDensity = Math.ceil(DEFAULT_DENSITY * Math.sqrt(ratio));
+                
+                // Cap density to avoid extreme blockiness, but ensure performance
+                if (newDensity < DEFAULT_DENSITY + 1) newDensity = DEFAULT_DENSITY + 1;
+                
+                // Re-scan with lower resolution
+                points = scanText(text, newDensity);
+            }
+
+            return points;
+        }
+
+        function startSequence() {
+            const text = input.value.toUpperCase().trim();
+            if (!text) return;
+
+            if (animationTimer) clearTimeout(animationTimer);
+            animationTimer = null;
+
+            wordQueue = text.split(/\s+/).filter(w => w.length > 0);
+            queueIndex = 0;
+
+            processQueue();
+        }
+
+        function processQueue() {
+            if (queueIndex >= wordQueue.length) {
+                state = 'idle';
+                particles.forEach(p => { p.targetX = null; p.targetY = null; });
+                setTimeout(adjustParticleCount, 500); 
+                return;
+            }
+
+            const currentWord = wordQueue[queueIndex];
+            
+            // Get adaptive coordinates (will degrade quality gracefully if limit is hit)
+            targetPoints = getTextCoordinates(currentWord);
+
+            // Hard cap safety (just in case re-scan was still slightly over due to estimation)
+            if (targetPoints.length > maxParticleCount) {
+                targetPoints = targetPoints.slice(0, maxParticleCount);
+            }
+
+            if (particles.length < targetPoints.length) {
+                const diff = targetPoints.length - particles.length;
+                for (let i = 0; i < diff; i++) {
+                    particles.push(new Particle());
+                }
+            }
+
+            targetPoints.sort((a, b) => a.x - b.x);
+
+            const minX = targetPoints.length > 0 ? targetPoints[0].x : 0;
+            const maxX = targetPoints.length > 0 ? targetPoints[targetPoints.length - 1].x : width;
+            const totalWidth = maxX - minX;
+
+            particles.forEach((p, i) => {
+                if (i < targetPoints.length) {
+                    p.targetX = targetPoints[i].x;
+                    p.targetY = targetPoints[i].y;
+                    
+                    const normalizedX = (p.targetX - minX) / (totalWidth || 1);
+                    p.moveDelay = normalizedX * 50; 
+                    p.moveTimer = 0;
+                } else {
+                    p.targetX = null;
+                    p.targetY = null;
+                }
+            });
+
+            state = 'forming';
+
+            animationTimer = setTimeout(() => {
+                state = 'holding';
+                
+                animationTimer = setTimeout(() => {
+                    explode();
+                    
+                    animationTimer = setTimeout(() => {
+                        queueIndex++;
+                        processQueue();
+                    }, 1000); 
+                    
+                }, 2500); 
+                
+            }, 1500); 
+        }
+
+        function explode() {
+            state = 'exploding';
+            particles.forEach(p => {
+                const angle = Math.random() * Math.PI * 2;
+                const force = Math.random() * 15 + 5;
+                p.vx = Math.cos(angle) * force;
+                p.vy = Math.sin(angle) * force;
+                p.targetX = null;
+                p.targetY = null;
+            });
+        }
+
+        function animate() {
+            if (analyser) {
+                const dataArray = new Uint8Array(analyser.frequencyBinCount);
+                analyser.getByteFrequencyData(dataArray);
+                
+                let sum = 0;
+                const bassBins = 4; 
+                for (let i = 0; i < bassBins; i++) {
+                    sum += dataArray[i];
+                }
+                const average = sum / bassBins;
+                
+                const normalized = Math.max(0, average - 30) / 180; 
+                pulseFactor = 1 + (Math.pow(normalized, 3) * 4);
+            } else {
+                pulseFactor = 1;
+            }
+
+            ctx.fillStyle = '#02021a'; 
+            ctx.fillRect(0, 0, width, height);
+
+            // Draw Stars first (Background)
+            stars.forEach(star => {
+                star.update();
+                star.draw();
+            });
+
+            // Draw Particles
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        btn.addEventListener('click', startSequence);
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') startSequence();
+        });
+
+        resize(); // Init size + stars
+        initParticles();
+        animate();
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D City Music Visualizer</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #111; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: white; }
+        canvas { display: block; }
+        
+        #ui-container {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.85);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #333;
+            width: 320px; /* Slightly wider for inputs */
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+            z-index: 10;
+        }
+
+        /* Scrollbar styling */
+        #ui-container::-webkit-scrollbar { width: 6px; }
+        #ui-container::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+
+        h1 { margin: 0 0 15px 0; font-size: 18px; color: #4ade80; text-transform: uppercase; letter-spacing: 1px; }
+        h2 { margin: 15px 0 5px 0; font-size: 14px; color: #fff; border-bottom: 1px solid #333; padding-bottom: 2px; }
+
+        .control-group { margin-bottom: 12px; }
+        label { display: block; font-size: 11px; color: #aaa; margin-bottom: 4px; }
+        
+        input[type="range"] { width: 100%; accent-color: #4ade80; }
+        
+        input[type="text"] { 
+            width: 100%; 
+            background: #222; 
+            border: 1px solid #444; 
+            color: #fff; 
+            padding: 5px; 
+            border-radius: 4px;
+            font-size: 12px;
+            box-sizing: border-box; /* Important for padding */
+        }
+        input[type="text"]:focus { outline: none; border-color: #4ade80; }
+
+        .btn {
+            background: #4ade80;
+            color: #000;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            width: 100%;
+            transition: background 0.2s;
+            text-align: center;
+        }
+        .btn:hover { background: #22c55e; }
+        
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        
+        .file-input-wrapper input[type=file] {
+            font-size: 100px;
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            font-family: monospace;
+            font-size: 12px;
+            margin-top: 10px;
+            color: #4ade80;
+        }
+
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            color: #4ade80;
+            pointer-events: none;
+            display: none;
+        }
+
+        #overlay {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            text-align: right;
+            pointer-events: none;
+            color: rgba(255,255,255,0.5);
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui-container">
+        <h1>Sonic City 3D</h1>
+        
+        <div class="control-group">
+            <div class="file-input-wrapper">
+                <button class="btn">📂 Upload MP3 / WAV</button>
+                <input type="file" id="audioInput" accept="audio/*">
+            </div>
+            <button id="playPauseBtn" class="btn" disabled>Play / Pause</button>
+        </div>
+
+        <div class="control-group">
+            <label>Sensitivity <span id="sensValue">1.5</span></label>
+            <input type="range" id="sensitivity" min="0.5" max="3.0" step="0.1" value="1.5">
+        </div>
+
+        <div class="control-group">
+            <label>City Density <span id="densityValue">4</span></label>
+            <input type="range" id="density" min="2" max="8" step="1" value="4">
+        </div>
+
+        <h2>Fireworks Text</h2>
+        <div class="control-group">
+            <label style="color:#ff5555">Low Freq (Bass)</label>
+            <input type="text" id="lowText" value="BASS, BOOM, DROP, HEAVY">
+        </div>
+        <div class="control-group">
+            <label style="color:#55ff55">Mid Freq (Vocals/Snare)</label>
+            <input type="text" id="midText" value="VIBE, SOUL, RHYTHM, YEAH">
+        </div>
+        <div class="control-group">
+            <label style="color:#55ffff">High Freq (Hats/Synth)</label>
+            <input type="text" id="highText" value="GLOW, SHINE, FLASH, ZING">
+        </div>
+
+        <div class="stats">
+            <span>VOL: <span id="volStat">0</span>%</span>
+            <span>PEAK: <span id="peakStat">0</span>%</span>
+        </div>
+    </div>
+
+    <div id="overlay">
+        Drag to Rotate • Scroll to Zoom<br>
+        Auto-rotate active when idle
+    </div>
+
+    <div id="loading">Generating City...</div>
+
+    <!-- Three.js Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        // --- Configuration & State ---
+        const config = {
+            gridSize: 4, 
+            sensitivity: 1.5,
+            autoRotateDelay: 3000,
+            baseColor: new THREE.Color(0.15, 0.15, 0.18),
+            windowOffColor: new THREE.Color(0.05, 0.05, 0.05)
+        };
+
+        // Separate word lists for bands
+        let wordLists = {
+            low: ["BASS", "BOOM", "DROP"],
+            mid: ["VIBE", "SOUL", "RHYTHM"],
+            high: ["GLOW", "SHINE", "FLASH"]
+        };
+
+        let state = {
+            isPlaying: false,
+            lastInteraction: Date.now(),
+            autoRotating: false,
+            audioContext: null,
+            analyser: null,
+            source: null,
+            audioData: null,
+            volume: 0,
+            // Independent beat detection thresholds
+            beatThresholds: { low: 0.6, mid: 0.5, high: 0.4 },
+            lastBeatTimes: { low: 0, mid: 0, high: 0 }
+        };
+
+        // --- Three.js Globals ---
+        let scene, camera, renderer, controls;
+        let buildings = []; 
+        let fireworks = []; 
+        let clock = new THREE.Clock();
+
+        // --- Utils ---
+        function getRandomColor() {
+            // Generate vibrant colors (High saturation, Mid-High lightness)
+            const h = Math.random();
+            const s = 0.8 + Math.random() * 0.2; // 0.8 - 1.0
+            const l = 0.5 + Math.random() * 0.1; // 0.5 - 0.6
+            return new THREE.Color().setHSL(h, s, l);
+        }
+
+        // --- Audio Setup ---
+        async function setupAudio(file) {
+            if (state.audioContext) state.audioContext.close();
+            
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            state.audioContext = new AudioContext();
+            
+            const arrayBuffer = await file.arrayBuffer();
+            const audioBuffer = await state.audioContext.decodeAudioData(arrayBuffer);
+            
+            state.source = state.audioContext.createBufferSource();
+            state.source.buffer = audioBuffer;
+            state.source.loop = true; 
+            
+            state.analyser = state.audioContext.createAnalyser();
+            state.analyser.fftSize = 256; 
+            state.analyser.smoothingTimeConstant = 0.8;
+            
+            state.source.connect(state.analyser);
+            state.analyser.connect(state.audioContext.destination);
+            
+            state.audioData = new Uint8Array(state.analyser.frequencyBinCount);
+            
+            state.source.start(0);
+            state.isPlaying = true;
+            document.getElementById('playPauseBtn').innerText = "Pause";
+            document.getElementById('playPauseBtn').disabled = false;
+        }
+
+        function togglePlay() {
+            if (!state.audioContext) return;
+            
+            if (state.audioContext.state === 'running') {
+                state.audioContext.suspend();
+                state.isPlaying = false;
+                document.getElementById('playPauseBtn').innerText = "Play";
+            } else {
+                state.audioContext.resume();
+                state.isPlaying = true;
+                document.getElementById('playPauseBtn').innerText = "Pause";
+            }
+        }
+
+        // --- Shader for Building Windows ---
+        const buildingVertexShader = `
+            varying vec2 vUv;
+            varying vec3 vNormal;
+            void main() {
+                vUv = uv;
+                vNormal = normal;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+        `;
+
+        const buildingFragmentShader = `
+            uniform float uTime;
+            uniform float uLevel; 
+            uniform float uHeight; 
+            uniform float uIsMega; // New Uniform to identify the center tower
+
+            varying vec2 vUv;
+            varying vec3 vNormal;
+            
+            const vec3 colorOff = vec3(0.1, 0.1, 0.12);
+            const vec3 colorGreen = vec3(0.1, 0.9, 0.3);
+            const vec3 colorYellow = vec3(0.95, 0.9, 0.1);
+            const vec3 colorRed = vec3(1.0, 0.2, 0.2);
+            const vec3 colorRoof = vec3(0.05, 0.05, 0.07);
+
+            void main() {
+                float light = dot(vNormal, normalize(vec3(1.0, 1.0, 1.0))) * 0.5 + 0.5;
+                
+                if (vNormal.y > 0.9) {
+                    gl_FragColor = vec4(colorRoof * light, 1.0);
+                    return;
+                }
+
+                vec2 gridUV = vUv * vec2(4.0, uHeight * 4.0);
+                vec2 gridSt = fract(gridUV);
+
+                float frameX = step(0.15, gridSt.x) * step(gridSt.x, 0.85);
+                float frameY = step(0.15, gridSt.y) * step(gridSt.y, 0.85);
+                float isWindow = frameX * frameY;
+
+                float normalizedHeight = vUv.y;
+                bool isLit = normalizedHeight < uLevel;
+
+                vec3 finalColor = colorOff;
+
+                if (isWindow > 0.5) {
+                    if (uIsMega > 0.5) {
+                        // --- MEGA TOWER LOGIC: Scrolling Color Wheel ---
+                        // Scroll vertically based on time
+                        float scroll = fract(vUv.y - uTime * 0.2); 
+                        
+                        // Map scroll position to Green -> Yellow -> Red -> Green
+                        // 0.0 - 0.5: Green to Yellow
+                        // 0.5 - 1.0: Yellow to Red
+                        vec3 wheelColor;
+                        if (scroll < 0.5) {
+                            wheelColor = mix(colorGreen, colorYellow, scroll * 2.0);
+                        } else {
+                            wheelColor = mix(colorYellow, colorRed, (scroll - 0.5) * 2.0);
+                        }
+                        
+                        finalColor = wheelColor * 2.0; // Boost brightness
+                    } 
+                    else if (isLit) {
+                        // --- STANDARD BUILDING LOGIC: Audio Reactive ---
+                        if (normalizedHeight < 0.5) {
+                            finalColor = colorGreen;
+                        } else if (normalizedHeight < 0.8) {
+                            finalColor = colorYellow;
+                        } else {
+                            finalColor = colorRed;
+                        }
+                        finalColor *= 1.5; 
+                    } else {
+                        finalColor = vec3(0.02, 0.02, 0.03); 
+                    }
+                } else {
+                    finalColor = vec3(0.15, 0.15, 0.18);
+                }
+
+                gl_FragColor = vec4(finalColor * light, 1.0);
+            }
+        `;
+
+        // --- Firework / Lyric System ---
+        class TextFirework {
+            constructor(text, x, z, color) {
+                this.isDead = false;
+                this.age = 0;
+                this.lifeSpan = 2.0; 
+                this.particles = [];
+                
+                // Color formatting for canvas
+                const colorStyle = `rgb(${Math.floor(color.r*255)}, ${Math.floor(color.g*255)}, ${Math.floor(color.b*255)})`;
+
+                // 1. Create Text Sprite
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = 512;
+                canvas.height = 128;
+                
+                // Enhanced Glow
+                ctx.shadowColor = colorStyle;
+                ctx.shadowBlur = 40; // Increased blur for more glow
+                
+                ctx.font = "Bold 70px 'Segoe UI', Arial"; // Bigger font
+                ctx.fillStyle = "white"; 
+                ctx.textAlign = "center";
+                ctx.strokeStyle = colorStyle; 
+                ctx.lineWidth = 6; // Thicker stroke
+                
+                ctx.strokeText(text, 256, 80);
+                ctx.fillText(text, 256, 80);
+                
+                const texture = new THREE.CanvasTexture(canvas);
+                const material = new THREE.SpriteMaterial({ 
+                    map: texture, 
+                    transparent: true,
+                    opacity: 1,
+                    depthWrite: false,
+                    color: 0xffffff,
+                    blending: THREE.AdditiveBlending // Make it bright and glowing
+                });
+                
+                this.sprite = new THREE.Sprite(material);
+                
+                // Height: keep it somewhat low but safe (10-15 range)
+                this.sprite.position.set(x, 10 + Math.random() * 5, z);
+                
+                // Bigger Scale
+                this.sprite.scale.set(18, 5, 1);
+                
+                scene.add(this.sprite);
+
+                // 2. Create Explosion Particles
+                const particleCount = 40; // More particles
+                const geom = new THREE.BufferGeometry();
+                const positions = new Float32Array(particleCount * 3);
+                const velocities = [];
+
+                for(let i=0; i<particleCount; i++) {
+                    positions[i*3] = this.sprite.position.x;
+                    positions[i*3+1] = this.sprite.position.y;
+                    positions[i*3+2] = this.sprite.position.z;
+                    
+                    // Wider Spread
+                    velocities.push({
+                        x: (Math.random() - 0.5) * 2.0, 
+                        y: (Math.random() - 0.5) * 2.0, 
+                        z: (Math.random() - 0.5) * 2.0  
+                    });
+                }
+                
+                geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                const pMat = new THREE.PointsMaterial({
+                    color: color, 
+                    size: 1.5, // Bigger particles
+                    transparent: true,
+                    opacity: 1,
+                    blending: THREE.AdditiveBlending // Brighter mixing
+                });
+                
+                this.points = new THREE.Points(geom, pMat);
+                this.velocities = velocities;
+                scene.add(this.points);
+            }
+
+            update(dt) {
+                this.age += dt;
+                
+                // Animate Text
+                this.sprite.position.y += dt * 0.5; // Slower rise for mass perception
+                this.sprite.material.opacity = 1 - (this.age / this.lifeSpan);
+                this.sprite.scale.x += dt * 1.5; // Expands faster
+                this.sprite.scale.y += dt * 0.5;
+
+                // Animate Particles
+                const positions = this.points.geometry.attributes.position.array;
+                for(let i=0; i<this.velocities.length; i++) {
+                    // Apply drag/gravity effect for more realism
+                    this.velocities[i].y -= dt * 0.5; 
+                    
+                    positions[i*3] += this.velocities[i].x;
+                    positions[i*3+1] += this.velocities[i].y;
+                    positions[i*3+2] += this.velocities[i].z;
+                }
+                this.points.geometry.attributes.position.needsUpdate = true;
+                this.points.material.opacity = 1 - (this.age / this.lifeSpan);
+
+                if (this.age >= this.lifeSpan) {
+                    this.isDead = true;
+                    scene.remove(this.sprite);
+                    scene.remove(this.points);
+                    this.sprite.material.map.dispose();
+                    this.sprite.material.dispose();
+                    this.points.geometry.dispose();
+                    this.points.material.dispose();
+                }
+            }
+        }
+
+        // --- Scene Generation ---
+        function init() {
+            // Container
+            const container = document.createElement('div');
+            document.body.appendChild(container);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            container.appendChild(renderer.domElement);
+
+            // Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x050508);
+            scene.fog = new THREE.FogExp2(0x050508, 0.02);
+
+            // Camera
+            const aspect = window.innerWidth / window.innerHeight;
+            camera = new THREE.PerspectiveCamera(40, aspect, 0.1, 1000);
+            camera.position.set(30, 30, 30);
+            camera.lookAt(0, 0, 0);
+
+            // Controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxPolarAngle = Math.PI / 2 - 0.05;
+            controls.minDistance = 10;
+            controls.maxDistance = 100;
+
+            controls.addEventListener('start', () => {
+                state.lastInteraction = Date.now();
+                state.autoRotating = false;
+            });
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0x404040, 2);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+            dirLight.position.set(20, 40, 10);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 2048;
+            dirLight.shadow.mapSize.height = 2048;
+            dirLight.shadow.camera.left = -50;
+            dirLight.shadow.camera.right = 50;
+            dirLight.shadow.camera.top = 50;
+            dirLight.shadow.camera.bottom = -50;
+            scene.add(dirLight);
+
+            // Floor
+            const gridHelper = new THREE.GridHelper(200, 200, 0x333333, 0x111111);
+            scene.add(gridHelper);
+
+            const planeGeo = new THREE.PlaneGeometry(300, 300);
+            const planeMat = new THREE.MeshBasicMaterial({ color: 0x08080a });
+            const plane = new THREE.Mesh(planeGeo, planeMat);
+            plane.rotation.x = -Math.PI / 2;
+            plane.position.y = -0.1;
+            scene.add(plane);
+
+            // Initial City Generation
+            generateCity();
+
+            // Resize Handler
+            window.addEventListener('resize', onWindowResize, false);
+            
+            // UI Listeners
+            setupUIListeners();
+            
+            // Animation Loop
+            animate();
+        }
+
+        function createBuilding(x, z, width, height, isMega) {
+            const geometry = new THREE.BoxGeometry(width, height, width);
+            geometry.translate(0, height / 2, 0);
+
+            const material = new THREE.ShaderMaterial({
+                uniforms: {
+                    uTime: { value: 0 },
+                    uLevel: { value: 0.0 },
+                    uHeight: { value: height },
+                    uIsMega: { value: isMega ? 1.0 : 0.0 } // Pass Mega Flag
+                },
+                vertexShader: buildingVertexShader,
+                fragmentShader: buildingFragmentShader,
+                transparent: false
+            });
+
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.position.set(x, 0, z);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+
+            const dist = Math.sqrt(x*x + z*z);
+            const freqIndex = isMega ? 0 : Math.floor(dist * 2.5) + (Math.floor(Math.random()*5));
+
+            mesh.userData = {
+                id: buildings.length,
+                baseHeight: height,
+                freqIndex: freqIndex
+            };
+
+            scene.add(mesh);
+            buildings.push(mesh);
+        }
+
+        function generateCity() {
+            buildings.forEach(b => scene.remove(b));
+            buildings = [];
+
+            const cityRadius = config.gridSize; 
+            const blockSize = 2; 
+            const buildingWidth = 1.2;
+            const streetWidth = 1.0;
+            const blockGap = (blockSize * buildingWidth) + streetWidth;
+
+            createBuilding(0, 0, 2.5, 35, true); 
+
+            for (let xBlock = -cityRadius; xBlock <= cityRadius; xBlock++) {
+                for (let zBlock = -cityRadius; zBlock <= cityRadius; zBlock++) {
+                    if (xBlock === 0 && zBlock === 0) continue;
+
+                    const distToCenter = Math.sqrt(xBlock*xBlock + zBlock*zBlock);
+                    const maxDist = Math.sqrt(cityRadius*cityRadius*2);
+                    let normDist = distToCenter / maxDist;
+                    let heightTier = Math.pow(1 - normDist, 2); 
+
+                    for (let bx = 0; bx < blockSize; bx++) {
+                        for (let bz = 0; bz < blockSize; bz++) {
+                            if (Math.random() > 0.85 && heightTier < 0.5) continue;
+
+                            let xPos = (xBlock * blockGap) + (bx * buildingWidth) - (blockGap/2) + (streetWidth/2) + (buildingWidth/2);
+                            let zPos = (zBlock * blockGap) + (bz * buildingWidth) - (blockGap/2) + (streetWidth/2) + (buildingWidth/2);
+
+                            let h = 2 + (Math.random() * 3); 
+                            h += heightTier * 25; 
+                            h *= (0.8 + Math.random() * 0.4); 
+
+                            if (heightTier < 0.2) h = 1 + Math.random() * 2;
+
+                            createBuilding(xPos, zPos, buildingWidth * 0.9, h, false);
+                        }
+                    }
+                }
+            }
+        }
+
+        function setupUIListeners() {
+            document.getElementById('audioInput').addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) setupAudio(file);
+            });
+
+            document.getElementById('playPauseBtn').addEventListener('click', togglePlay);
+
+            document.getElementById('sensitivity').addEventListener('input', (e) => {
+                config.sensitivity = parseFloat(e.target.value);
+                document.getElementById('sensValue').innerText = config.sensitivity.toFixed(1);
+            });
+
+            document.getElementById('density').addEventListener('input', (e) => {
+                config.gridSize = parseInt(e.target.value);
+                document.getElementById('densityValue').innerText = config.gridSize;
+                generateCity();
+            });
+
+            // Input handlers
+            function updateWords() {
+                const parse = (id) => document.getElementById(id).value.split(',').map(s=>s.trim()).filter(s=>s);
+                wordLists.low = parse('lowText');
+                wordLists.mid = parse('midText');
+                wordLists.high = parse('highText');
+            }
+            
+            // Initial read
+            updateWords();
+            
+            ['lowText', 'midText', 'highText'].forEach(id => {
+                document.getElementById(id).addEventListener('change', updateWords);
+            });
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function triggerFirework(type) {
+            const list = wordLists[type];
+            if (!list || list.length === 0) return;
+            
+            const word = list[Math.floor(Math.random() * list.length)];
+            
+            // Spawning Logic: Ring outside the city
+            const angle = Math.random() * Math.PI * 2;
+            const radius = 16 + Math.random() * 12; // Radius 16 to 28
+            
+            const x = Math.cos(angle) * radius;
+            const z = Math.sin(angle) * radius;
+
+            const color = getRandomColor();
+
+            fireworks.push(new TextFirework(word, x, z, color));
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const dt = clock.getDelta();
+            const time = clock.getElapsedTime();
+            const now = Date.now();
+
+            if (now - state.lastInteraction > config.autoRotateDelay) {
+                controls.autoRotate = true;
+                controls.autoRotateSpeed = 1.0;
+            } else {
+                controls.autoRotate = false;
+            }
+            controls.update();
+
+            // Audio Processing
+            let maxVal = 0;
+            let volSum = 0;
+            
+            if (state.analyser && state.isPlaying) {
+                state.analyser.getByteFrequencyData(state.audioData);
+                
+                const data = state.audioData;
+                const totalBins = data.length;
+                
+                // Define Bands
+                const lowEnd = Math.floor(totalBins * 0.1);  // 0 - 10%
+                const midEnd = Math.floor(totalBins * 0.5);  // 10 - 50%
+                // High is rest
+                
+                let sumLow = 0, sumMid = 0, sumHigh = 0;
+                
+                for(let i=0; i<totalBins; i++) {
+                    const val = data[i];
+                    volSum += val;
+                    if(val > maxVal) maxVal = val;
+                    
+                    if(i < lowEnd) sumLow += val;
+                    else if(i < midEnd) sumMid += val;
+                    else sumHigh += val;
+                }
+                
+                const avgLow = sumLow / lowEnd;
+                const avgMid = sumMid / (midEnd - lowEnd);
+                const avgHigh = sumHigh / (totalBins - midEnd);
+                const avgVol = volSum / totalBins;
+
+                // --- Beat Detection Logic ---
+                // Helper for logic
+                const checkBeat = (val, type, cooldown) => {
+                    const norm = val / 255;
+                    if (norm > state.beatThresholds[type] && (now - state.lastBeatTimes[type] > cooldown)) {
+                        triggerFirework(type);
+                        state.lastBeatTimes[type] = now;
+                        state.beatThresholds[type] = Math.min(norm * 1.1, 0.95); // Bump threshold
+                    } else {
+                        state.beatThresholds[type] *= 0.98; // Decay
+                        if(state.beatThresholds[type] < 0.35) state.beatThresholds[type] = 0.35;
+                    }
+                };
+
+                // Low freq trigger (Bass) - Slower cooldown
+                checkBeat(avgLow, 'low', 600);
+                
+                // Mid freq trigger - Medium cooldown
+                checkBeat(avgMid, 'mid', 400);
+
+                // High freq trigger - Fast cooldown
+                checkBeat(avgHigh, 'high', 250);
+
+                // Update UI numbers
+                document.getElementById('volStat').innerText = Math.round((avgVol / 255) * 100);
+                document.getElementById('peakStat').innerText = Math.round((maxVal / 255) * 100);
+
+                // Update Buildings
+                buildings.forEach((mesh) => {
+                    let dataIndex = mesh.userData.freqIndex % data.length;
+                    let rawValue = data[dataIndex];
+                    let normalizedValue = (rawValue / 255.0) * config.sensitivity;
+                    normalizedValue = Math.min(Math.max(normalizedValue, 0), 1);
+                    
+                    mesh.material.uniforms.uLevel.value = normalizedValue;
+                    mesh.material.uniforms.uTime.value = time;
+                });
+
+            } else {
+                // Idle animation
+                buildings.forEach((mesh) => {
+                    const idle = (Math.sin(time * 2 + mesh.position.x) * 0.5 + 0.5) * 0.05;
+                    mesh.material.uniforms.uLevel.value = idle;
+                    mesh.material.uniforms.uTime.value = time;
+                });
+            }
+
+            // Update Fireworks
+            for (let i = fireworks.length - 1; i >= 0; i--) {
+                fireworks[i].update(dt);
+                if (fireworks[i].isDead) {
+                    fireworks.splice(i, 1);
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // Boot
+        init();
+
+    </script>
+</body>
+</html>

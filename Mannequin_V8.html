@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Wooden Mannequin</title>
+    <style>
+        :root {
+            --glass-bg: rgba(255, 255, 255, 0.85);
+            --glass-border: rgba(255, 255, 255, 0.5);
+            --accent-color: #3b82f6;
+            --accent-hover: #2563eb;
+            --text-color: #1f2937;
+            --bg-color: #111827;
+        }
+
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background-color: var(--bg-color); 
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+            color: var(--text-color);
+        }
+
+        /* --- Main Control Dock --- */
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            height: auto;
+            max-height: 35vh;
+            
+            display: flex;
+            flex-direction: row;
+            gap: 20px;
+            
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 16px;
+            
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            overflow-x: auto;
+            overflow-y: hidden;
+            scrollbar-width: thin;
+            pointer-events: auto;
+            z-index: 10;
+        }
+
+        /* Scrollbar Styling */
+        #controls::-webkit-scrollbar { height: 6px; }
+        #controls::-webkit-scrollbar-track { background: transparent; }
+        #controls::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 10px; }
+
+        /* --- Sections --- */
+        .control-group { 
+            display: flex; 
+            flex-direction: column; 
+            min-width: 160px;
+            flex-shrink: 0;
+            border-right: 1px solid rgba(0,0,0,0.1);
+            padding-right: 20px;
+        }
+        .control-group:last-child { border-right: none; }
+
+        /* Dance Section Special Styling */
+        .group-dance {
+            background: rgba(255, 248, 225, 0.6);
+            border-radius: 12px;
+            padding: 10px;
+            border: 1px solid rgba(255, 160, 0, 0.2);
+            margin-right: 10px;
+        }
+
+        label { 
+            font-size: 11px; 
+            font-weight: 700; 
+            text-transform: uppercase; 
+            letter-spacing: 0.8px; 
+            color: #6b7280; 
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        /* --- Inputs & Sliders --- */
+        input[type=range] { 
+            width: 100%; 
+            height: 4px; 
+            background: #e5e7eb; 
+            border-radius: 2px; 
+            outline: none; 
+            margin: 10px 0 5px 0;
+            accent-color: var(--accent-color);
+        }
+        
+        .labels { 
+            display: flex; 
+            justify-content: space-between; 
+            font-size: 9px; 
+            color: #9ca3af; 
+            margin-bottom: 8px;
+        }
+
+        input[type=file] {
+            font-size: 10px;
+            margin-bottom: 5px;
+            width: 100%;
+        }
+
+        audio {
+            width: 100%;
+            height: 25px;
+            margin-bottom: 5px;
+        }
+
+        /* --- Grid Layouts for Buttons --- */
+        .actions { display: grid; gap: 6px; }
+        .actions-2 { grid-template-columns: 1fr 1fr; }
+        .actions-3 { grid-template-columns: 1fr 1fr 1fr; }
+        .actions-scroll { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+
+        /* --- Buttons --- */
+        button {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 8px 4px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #374151;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        button:hover {
+            background: #f9fafb;
+            border-color: #d1d5db;
+            transform: translateY(-1px);
+        }
+
+        button:active, button.active {
+            background: var(--accent-color);
+            color: white;
+            border-color: var(--accent-hover);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+            transform: translateY(0);
+        }
+
+        /* Specific Button Colors */
+        #btnDance { background: #fff7ed; border-color: #fdba74; color: #c2410c; }
+        #btnDance.active { background: #ea580c; color: white; border-color: #c2410c; }
+        
+        #btnReset { background: #fef2f2; color: #ef4444; border-color: #fca5a5; }
+        #btnReset:hover { background: #fee2e2; }
+
+        /* --- Instruction Overlay --- */
+        #instruction {
+            position: absolute;
+            top: 20px;
+            width: 100%;
+            text-align: center;
+            color: rgba(255,255,255,0.4);
+            font-size: 12px;
+            pointer-events: none;
+            user-select: none;
+            letter-spacing: 1px;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+        }
+    </style>
+    <!-- Import Map for Three.js -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="instruction">DRAG TO ROTATE • SCROLL TO ZOOM • RIGHT CLICK TO PAN</div>
+
+    <div id="controls">
+        
+        <!-- MODULE 1: DANCE & AUDIO -->
+        <div class="control-group group-dance" style="min-width: 200px;">
+            <label>🎵 Dance Studio</label>
+            <input type="file" id="audioUpload" accept="audio/*">
+            <audio id="audioPlayer" controls></audio>
+            <button id="btnDance">Start Dance Mode</button>
+            <div style="margin-top: 8px;">
+                <label style="margin-bottom:2px;">Energy</label>
+                <input type="range" id="danceComplexity" min="0" max="1" step="0.1" value="0.5">
+            </div>
+        </div>
+
+        <!-- MODULE 2: GLOBAL SETTINGS -->
+        <div class="control-group">
+            <label>Globals</label>
+            
+            <label style="margin-top: 4px;">Style</label>
+            <div class="actions-scroll">
+                <button id="btnStyleWood" class="active">Wood</button>
+                <button id="btnStyleMetal">Metal</button>
+                <button id="btnStyleNeon">Neon</button>
+                <button id="btnStyleWire">Wire</button>
+                <button id="btnStyleColor">Color</button>
+            </div>
+
+            <label style="margin-top: 8px;">Speed</label>
+            <input type="range" id="stateSlider" min="0" max="2" step="0.01" value="0">
+            <div class="labels"><span>Idle</span><span>Run</span></div>
+            
+            <div class="actions actions-2">
+                <button id="btnReset">Reset</button>
+                <button id="btnTPose">T-Pose</button>
+            </div>
+        </div>
+
+        <!-- MODULE 3: BODY ACTIONS -->
+        <div class="control-group">
+            <label>Body Actions</label>
+            <div class="actions actions-2">
+                <button id="btnSquat">Squat</button>
+                <button id="btnJump">Jump</button>
+                <button id="btnClap">Clap</button>
+                <button id="btnSway">Sway</button>
+                <button id="btnSpin">Spin</button>
+                <button id="btnDummy" style="visibility:hidden;">-</button> <!-- Spacer -->
+            </div>
+        </div>
+
+        <!-- MODULE 4: HEAD & TORSO -->
+        <div class="control-group">
+            <label>Head & Torso</label>
+            <input type="range" id="nodSlider" min="0" max="2" step="0.1" value="0">
+            <div class="labels"><span>Still</span><span>Bang</span></div>
+            
+            <div class="actions actions-2">
+                <button id="btnLookL">Look L</button>
+                <button id="btnLookR">Look R</button>
+                <button id="btnBendL">Bend L</button>
+                <button id="btnBendR">Bend R</button>
+                <button id="btnStepL">Step L</button>
+                <button id="btnStepR">Step R</button>
+            </div>
+        </div>
+
+        <!-- MODULE 5: LEFT LIMBS -->
+        <div class="control-group">
+            <label>Left Side</label>
+            <div class="actions actions-2">
+                <button id="btnHandL">Raise Arm</button>
+                <button id="btnHandLHalf">Half Arm</button>
+                <button id="btnPtL_F">Point Fwd</button>
+                <button id="btnPtL_S">Point Side</button>
+                <button id="btnLKickFwd">Kick Fwd</button>
+                <button id="btnLKickSide">Kick Side</button>
+                <button id="btnLHalfKick">Knee</button>
+            </div>
+        </div>
+
+        <!-- MODULE 6: RIGHT LIMBS -->
+        <div class="control-group">
+            <label>Right Side</label>
+            <div class="actions actions-2">
+                <button id="btnHandR">Raise Arm</button>
+                <button id="btnHandRHalf">Half Arm</button>
+                <button id="btnPtR_F">Point Fwd</button>
+                <button id="btnPtR_S">Point Side</button>
+                <button id="btnRKickFwd">Kick Fwd</button>
+                <button id="btnRKickSide">Kick Side</button>
+                <button id="btnRHalfKick">Knee</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // --- Configuration ---
+        const WOOD_COLOR = 0xE5C29F;
+        const JOINT_COLOR = 0xD2B48C;
+        const BACKGROUND_COLOR = 0x111827; // Dark Blue-Grey
+        const BASE_HIP_HEIGHT = 2.35;
+
+        // --- Scene Setup ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(BACKGROUND_COLOR);
+        scene.fog = new THREE.Fog(BACKGROUND_COLOR, 10, 50);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(0, 4, 14); // Adjusted camera
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.SoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+
+        // --- Lighting ---
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
+        hemiLight.position.set(0, 20, 0);
+        scene.add(hemiLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+        dirLight.position.set(5, 10, 7);
+        dirLight.castShadow = true;
+        dirLight.shadow.camera.top = 5;
+        dirLight.shadow.camera.bottom = -5;
+        dirLight.shadow.camera.left = -5;
+        dirLight.shadow.camera.right = 5;
+        dirLight.shadow.bias = -0.001;
+        dirLight.shadow.mapSize.width = 2048;
+        dirLight.shadow.mapSize.height = 2048;
+        scene.add(dirLight);
+
+        // --- Ground ---
+        const mesh = new THREE.Mesh(
+            new THREE.PlaneGeometry(100, 100),
+            new THREE.MeshPhongMaterial({ color: 0x1f2937, depthWrite: false })
+        );
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.receiveShadow = true;
+        scene.add(mesh);
+        
+        // Grid helper
+        const grid = new THREE.GridHelper(100, 40, 0x374151, 0x1f2937);
+        grid.position.y = 0.01;
+        grid.material.opacity = 0.4;
+        grid.material.transparent = true;
+        scene.add(grid);
+
+        // --- Materials ---
+        const woodMaterial = new THREE.MeshStandardMaterial({ 
+            color: WOOD_COLOR, 
+            roughness: 0.4,
+            metalness: 0.1
+        });
+        const jointMaterial = new THREE.MeshStandardMaterial({ 
+            color: JOINT_COLOR, 
+            roughness: 0.5,
+            metalness: 0.1
+        });
+
+        // --- Mannequin Construction Helper ---
+        function createLimb(width, length, material) {
+            const mesh = new THREE.Mesh(new THREE.CylinderGeometry(width, width * 0.8, length, 16), material);
+            mesh.position.y = -length / 2; 
+            mesh.castShadow = true;
+            mesh.userData.partType = 'body'; 
+            return mesh;
+        }
+
+        function createJoint(size, material) {
+            const mesh = new THREE.Mesh(new THREE.SphereGeometry(size, 16, 16), material);
+            mesh.castShadow = true;
+            mesh.userData.partType = 'joint'; 
+            return mesh;
+        }
+
+        const mannequin = new THREE.Group();
+        scene.add(mannequin);
+
+        // 1. Hips (Root Center)
+        const hips = new THREE.Group();
+        hips.position.y = BASE_HIP_HEIGHT;
+        mannequin.add(hips);
+
+        // [Visual Hips Wrapper]
+        const hipsVisual = new THREE.Group();
+        hips.add(hipsVisual);
+
+        const hipsGeo = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.3, 0.4, 16), woodMaterial);
+        hipsGeo.rotation.z = Math.PI / 2;
+        hipsGeo.castShadow = true;
+        hipsGeo.userData.partType = 'body';
+        hipsVisual.add(hipsGeo); 
+
+        // 2. Spine/Torso
+        const spine = new THREE.Group();
+        spine.position.y = 0; 
+        hips.add(spine);
+
+        const torsoLower = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.6, 16), woodMaterial);
+        torsoLower.position.y = 0.4;
+        torsoLower.castShadow = true;
+        torsoLower.userData.partType = 'body';
+        spine.add(torsoLower);
+
+        const torsoUpper = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.35, 0.7, 16), woodMaterial);
+        torsoUpper.position.y = 1.1;
+        torsoUpper.castShadow = true;
+        torsoUpper.userData.partType = 'body';
+        spine.add(torsoUpper);
+
+        // Neck
+        const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.3, 16), woodMaterial);
+        neck.position.y = 1.6;
+        neck.castShadow = true;
+        neck.userData.partType = 'body';
+        spine.add(neck);
+
+        // Head
+        const headGroup = new THREE.Group();
+        headGroup.position.y = 1.75;
+        spine.add(headGroup);
+
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.35, 32, 32), woodMaterial);
+        head.position.y = 0.2;
+        head.castShadow = true;
+        head.userData.partType = 'body';
+        headGroup.add(head);
+
+        const nose = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.2, 16), woodMaterial);
+        nose.rotation.x = Math.PI / 2; 
+        nose.position.set(0, 0.2, 0.35); 
+        nose.castShadow = true;
+        nose.userData.partType = 'body';
+        headGroup.add(nose);
+
+        // --- Arms ---
+        function createArm(side) {
+            const isLeft = side === 'left';
+            const sign = isLeft ? 1 : -1;
+
+            const shoulder = new THREE.Group();
+            shoulder.position.set(sign * 0.6, 1.3, 0); 
+            spine.add(shoulder);
+
+            const shoulderGeo = createJoint(0.25, jointMaterial);
+            shoulder.add(shoulderGeo);
+
+            const upperArm = new THREE.Group();
+            shoulder.add(upperArm);
+            
+            const upperArmMesh = createLimb(0.13, 0.8, woodMaterial);
+            upperArm.add(upperArmMesh);
+
+            const elbow = new THREE.Group();
+            elbow.position.y = -0.8;
+            upperArm.add(elbow);
+
+            const elbowGeo = createJoint(0.18, jointMaterial);
+            elbow.add(elbowGeo);
+
+            const lowerArm = new THREE.Group();
+            elbow.add(lowerArm);
+
+            const lowerArmMesh = createLimb(0.11, 0.7, woodMaterial);
+            lowerArm.add(lowerArmMesh);
+
+            const hand = new THREE.Mesh(new THREE.SphereGeometry(0.15, 16, 16), woodMaterial);
+            hand.position.y = -0.7;
+            hand.castShadow = true;
+            hand.userData.partType = 'body';
+            lowerArm.add(hand);
+
+            return { shoulder, upperArm, elbow, lowerArm, hand };
+        }
+
+        const leftArm = createArm('left');
+        const rightArm = createArm('right');
+
+        // --- Legs ---
+        function createLeg(side) {
+            const isLeft = side === 'left';
+            const sign = isLeft ? 1 : -1;
+
+            const hipJoint = new THREE.Group();
+            hipJoint.position.set(sign * 0.25, -0.2, 0); 
+            hips.add(hipJoint); 
+
+            const hipGeo = createJoint(0.28, jointMaterial);
+            hipJoint.add(hipGeo);
+
+            const upperLeg = new THREE.Group();
+            hipJoint.add(upperLeg);
+
+            const upperLegMesh = createLimb(0.18, 1.0, woodMaterial);
+            upperLeg.add(upperLegMesh);
+
+            const knee = new THREE.Group();
+            knee.position.y = -1.0;
+            upperLeg.add(knee);
+
+            const kneeGeo = createJoint(0.2, jointMaterial);
+            knee.add(kneeGeo);
+
+            const lowerLeg = new THREE.Group();
+            knee.add(lowerLeg);
+
+            const lowerLegMesh = createLimb(0.14, 1.0, woodMaterial);
+            lowerLeg.add(lowerLegMesh);
+
+            const foot = new THREE.Group();
+            foot.position.y = -1.0;
+            lowerLeg.add(foot);
+
+            const footGeo = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.15, 0.5), woodMaterial);
+            footGeo.position.set(0, -0.075, 0.15); 
+            footGeo.castShadow = true;
+            footGeo.userData.partType = 'body';
+            foot.add(footGeo);
+
+            return { hipJoint, upperLeg, knee, lowerLeg, foot };
+        }
+
+        const leftLeg = createLeg('left');
+        const rightLeg = createLeg('right');
+
+        // --- Style Functionality ---
+        function setMannequinStyle(style) {
+            mannequin.traverse((child) => {
+                if (child.isMesh) {
+                    const isJoint = child.userData.partType === 'joint';
+                    switch (style) {
+                        case 'wood': child.material = isJoint ? jointMaterial : woodMaterial; break;
+                        case 'metal': child.material = new THREE.MeshStandardMaterial({ color: isJoint ? 0x888888 : 0xaaaaaa, metalness: 1.0, roughness: 0.3 }); break;
+                        case 'neon': child.material = new THREE.MeshStandardMaterial({ color: 0x111111, emissive: isJoint ? 0xff00ff : 0x00ffff, emissiveIntensity: 1.5, metalness: 0.8, roughness: 0.1 }); break;
+                        case 'wire': child.material = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true }); break;
+                        case 'color': child.material = new THREE.MeshStandardMaterial({ color: new THREE.Color(`hsl(${Math.random() * 360}, 100%, 50%)`), roughness: 0.5, metalness: 0.1 }); break;
+                    }
+                }
+            });
+        }
+
+        // --- Controls ---
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.target.set(0, 3, 0);
+
+        // --- Interactions Setup ---
+        const stateSlider = document.getElementById('stateSlider');
+        const nodSlider = document.getElementById('nodSlider');
+        
+        // Button Map
+        const btns = {
+            wood: document.getElementById('btnStyleWood'), metal: document.getElementById('btnStyleMetal'),
+            neon: document.getElementById('btnStyleNeon'), wire: document.getElementById('btnStyleWire'), color: document.getElementById('btnStyleColor'),
+            squat: document.getElementById('btnSquat'), jump: document.getElementById('btnJump'),
+            clap: document.getElementById('btnClap'), tpose: document.getElementById('btnTPose'), reset: document.getElementById('btnReset'),
+            dance: document.getElementById('btnDance'),
+            lookL: document.getElementById('btnLookL'), lookR: document.getElementById('btnLookR'),
+            sway: document.getElementById('btnSway'), spin: document.getElementById('btnSpin'),
+            bendL: document.getElementById('btnBendL'), bendR: document.getElementById('btnBendR'),
+            stepL: document.getElementById('btnStepL'), stepR: document.getElementById('btnStepR'),
+            handL: document.getElementById('btnHandL'), handLHalf: document.getElementById('btnHandLHalf'),
+            ptL_F: document.getElementById('btnPtL_F'), ptL_S: document.getElementById('btnPtL_S'),
+            handR: document.getElementById('btnHandR'), handRHalf: document.getElementById('btnHandRHalf'),
+            ptR_F: document.getElementById('btnPtR_F'), ptR_S: document.getElementById('btnPtR_S'),
+            lKickFwd: document.getElementById('btnLKickFwd'), lKickSide: document.getElementById('btnLKickSide'), lHalfKick: document.getElementById('btnLHalfKick'),
+            rKickFwd: document.getElementById('btnRKickFwd'), rKickSide: document.getElementById('btnRKickSide'), rHalfKick: document.getElementById('btnRHalfKick')
+        };
+
+        const state = {
+            squat: false, clap: false, tpose: false, sway: false, spin: false,
+            bendL: false, bendR: false, lookL: false, lookR: false,
+            armL: 'none', armR: 'none', legL: 'none', legR: 'none'
+        };
+
+        // GLOBAL ANIMATION VARIABLE (FIX)
+        let simTime = 0;
+
+        // Dance Variables
+        let isDancing = false;
+        let audioCtx, analyser, dataArray;
+        const audioInput = document.getElementById('audioUpload');
+        const audioPlayer = document.getElementById('audioPlayer');
+        const danceComplexityInput = document.getElementById('danceComplexity');
+        let lastMoveTime = 0;
+        let currentEnergy = 0; 
+        
+        let danceStep = 0;
+        let stepsInPattern = 4;
+        let currentDanceTheme = { arms: 'none', legs: 'none', torso: 'none' };
+
+        // Physics/Anim Variables
+        let jumpState = 'none'; let jumpTimer = 0; let jumpVelocity = 0;
+        const GRAVITY = 0.015; const JUMP_FORCE = 0.45;
+        let sideStepDir = 0; let sideStepTimer = 0;
+        const STEP_OUT_DUR = 0.4; const STEP_SHIFT_DUR = 0.6; const STEP_CLOSE_DUR = 0.5; const STEP_PAUSE_DUR = 0.3; const STEP_DIST = 1.2;
+
+        // --- Event Listeners Helper ---
+        function toggleState(key, btnId) {
+            state[key] = !state[key];
+            if(btns[btnId]) btns[btnId].classList.toggle('active', state[key]);
+        }
+        
+        function toggleExclusive(key, btnId, pairKey, pairBtnId) {
+            state[key] = !state[key];
+            state[pairKey] = false;
+            if(btns[btnId]) btns[btnId].classList.toggle('active', state[key]);
+            if(btns[pairBtnId]) btns[pairBtnId].classList.remove('active');
+        }
+
+        function setActionState(category, action, btnId) {
+            const key = category;
+            if (state[key] === action) {
+                state[key] = 'none';
+                if(btns[btnId]) btns[btnId].classList.remove('active');
+            } else {
+                const siblingBtns = [];
+                if (category === 'armL') { siblingBtns.push(btns.handL, btns.handLHalf, btns.ptL_F, btns.ptL_S); } 
+                else if (category === 'armR') { siblingBtns.push(btns.handR, btns.handRHalf, btns.ptR_F, btns.ptR_S); } 
+                else if (category === 'legL') { siblingBtns.push(btns.lKickFwd, btns.lKickSide, btns.lHalfKick); } 
+                else if (category === 'legR') { siblingBtns.push(btns.rKickFwd, btns.rKickSide, btns.rHalfKick); }
+                siblingBtns.forEach(b => { if(b) b.classList.remove('active'); });
+                state[key] = action;
+                if(btns[btnId]) btns[btnId].classList.add('active');
+            }
+        }
+
+        function activateStyle(styleId, styleName) {
+            ['wood', 'metal', 'neon', 'wire', 'color'].forEach(s => { if(btns[s]) btns[s].classList.remove('active'); });
+            btns[styleId].classList.add('active');
+            setMannequinStyle(styleName);
+        }
+
+        // Style Events
+        btns.wood.addEventListener('click', () => activateStyle('wood', 'wood'));
+        btns.metal.addEventListener('click', () => activateStyle('metal', 'metal'));
+        btns.neon.addEventListener('click', () => activateStyle('neon', 'neon'));
+        btns.wire.addEventListener('click', () => activateStyle('wire', 'wire'));
+        btns.color.addEventListener('click', () => activateStyle('color', 'color'));
+
+        // Audio Events
+        audioInput.addEventListener('change', function() {
+            const file = this.files[0];
+            if (file) {
+                const url = URL.createObjectURL(file);
+                audioPlayer.src = url;
+            }
+        });
+
+        btns.dance.addEventListener('click', () => {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+                analyser = audioCtx.createAnalyser();
+                analyser.fftSize = 256;
+                dataArray = new Uint8Array(analyser.frequencyBinCount);
+                const source = audioCtx.createMediaElementSource(audioPlayer);
+                source.connect(analyser);
+                analyser.connect(audioCtx.destination);
+            }
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            isDancing = !isDancing;
+            btns.dance.classList.toggle('active', isDancing);
+            btns.dance.innerText = isDancing ? "Stop Dance Mode" : "Start Dance Mode";
+            if (isDancing) audioPlayer.play();
+            else { audioPlayer.pause(); resetState(); }
+        });
+
+        function resetState() {
+            for (let k in state) { if (typeof state[k] === 'boolean') state[k] = false; else state[k] = 'none'; }
+            sideStepDir = 0; hips.position.x = 0;
+            Object.values(btns).forEach(b => { if(b) b.classList.remove('active'); });
+            stateSlider.value = 0; nodSlider.value = 0;
+        }
+
+        // Dance Logic
+        function generateDanceTheme(complexity) {
+            const armMoves = ['none', 'full', 'half', 'pointFwd', 'pointSide'];
+            const legMoves = ['none', 'kickFwd', 'kickSide', 'halfKick'];
+            const torsoMoves = ['none', 'sway', 'bendL', 'bendR', 'spin'];
+            const activeChance = complexity * 0.7 + 0.3;
+
+            currentDanceTheme.arms = Math.random() < activeChance ? armMoves[Math.floor(Math.random() * armMoves.length)] : 'none';
+            currentDanceTheme.legs = Math.random() < activeChance ? legMoves[Math.floor(Math.random() * legMoves.length)] : 'none';
+            currentDanceTheme.torso = Math.random() < activeChance ? torsoMoves[Math.floor(Math.random() * torsoMoves.length)] : 'none';
+            if (Math.random() < 0.2 && complexity < 0.7) currentDanceTheme.arms = 'clap'; 
+        }
+
+        function applyDanceTheme(stepIndex) {
+            state.armL = 'none'; state.armR = 'none'; state.legL = 'none'; state.legR = 'none'; state.clap = false;
+            state.sway = (currentDanceTheme.torso === 'sway'); state.spin = (currentDanceTheme.torso === 'spin');
+            state.bendL = (currentDanceTheme.torso === 'bendL'); state.bendR = (currentDanceTheme.torso === 'bendR');
+
+            const isLeftTurn = (stepIndex % 2 === 0);
+            if (currentDanceTheme.arms === 'clap') state.clap = true;
+            else {
+                if (isLeftTurn) state.armL = currentDanceTheme.arms; else state.armR = currentDanceTheme.arms;
+            }
+            if (currentDanceTheme.legs !== 'none') {
+                if (isLeftTurn) state.legL = currentDanceTheme.legs; else state.legR = currentDanceTheme.legs;
+            }
+            if (currentDanceTheme.torso === 'none' && Math.random() < 0.3 && sideStepDir === 0) {
+                sideStepDir = isLeftTurn ? -1 : 1; sideStepTimer = 0;
+            }
+        }
+
+        function updateDanceLogic(t) {
+            if (!analyser || !isDancing) return;
+            analyser.getByteFrequencyData(dataArray);
+            let sum = 0; for(let i = 0; i < dataArray.length; i++) { sum += dataArray[i]; }
+            currentEnergy = (sum / dataArray.length) / 255.0; 
+
+            const complexity = parseFloat(danceComplexityInput.value);
+            const bass = dataArray[2] / 255.0; 
+            if (bass > 0.4) { nodSlider.value = Math.min(2, bass * 3); } else { nodSlider.value *= 0.9; }
+
+            const minInterval = THREE.MathUtils.lerp(0.8, 0.25, complexity); 
+            if (t - lastMoveTime > minInterval) {
+                if (currentEnergy > 0.18) { 
+                    danceStep++;
+                    if (danceStep >= stepsInPattern) {
+                        danceStep = 0; stepsInPattern = Math.random() > 0.5 ? 4 : 6;
+                        generateDanceTheme(complexity);
+                    }
+                    applyDanceTheme(danceStep);
+                    lastMoveTime = t;
+                }
+            }
+        }
+
+        // Toggles
+        btns.squat.addEventListener('click', () => toggleState('squat', 'squat'));
+        btns.clap.addEventListener('click', () => toggleState('clap', 'clap'));
+        btns.tpose.addEventListener('click', () => toggleState('tpose', 'tpose'));
+        btns.sway.addEventListener('click', () => toggleState('sway', 'sway'));
+        btns.spin.addEventListener('click', () => toggleState('spin', 'spin'));
+        btns.bendL.addEventListener('click', () => toggleExclusive('bendL', 'bendL', 'bendR', 'bendR'));
+        btns.bendR.addEventListener('click', () => toggleExclusive('bendR', 'bendR', 'bendL', 'bendL'));
+        btns.lookL.addEventListener('click', () => toggleExclusive('lookL', 'lookL', 'lookR', 'lookR'));
+        btns.lookR.addEventListener('click', () => toggleExclusive('lookR', 'lookR', 'lookL', 'lookL'));
+        
+        btns.jump.addEventListener('click', () => { if (jumpState === 'none' && !state.squat && !state.tpose) { jumpState = 'anticipate'; jumpTimer = 0; } });
+        btns.stepL.addEventListener('click', () => { if (sideStepDir === 0 && jumpState === 'none' && !state.squat && !state.tpose) { sideStepDir = -1; sideStepTimer = 0; } });
+        btns.stepR.addEventListener('click', () => { if (sideStepDir === 0 && jumpState === 'none' && !state.squat && !state.tpose) { sideStepDir = 1; sideStepTimer = 0; } });
+        btns.reset.addEventListener('click', resetState);
+
+        // Sets
+        btns.handL.addEventListener('click', () => setActionState('armL', 'full', 'handL'));
+        btns.handLHalf.addEventListener('click', () => setActionState('armL', 'half', 'handLHalf'));
+        btns.ptL_F.addEventListener('click', () => setActionState('armL', 'pointFwd', 'ptL_F'));
+        btns.ptL_S.addEventListener('click', () => setActionState('armL', 'pointSide', 'ptL_S'));
+        btns.handR.addEventListener('click', () => setActionState('armR', 'full', 'handR'));
+        btns.handRHalf.addEventListener('click', () => setActionState('armR', 'half', 'handRHalf'));
+        btns.ptR_F.addEventListener('click', () => setActionState('armR', 'pointFwd', 'ptR_F'));
+        btns.ptR_S.addEventListener('click', () => setActionState('armR', 'pointSide', 'ptR_S'));
+        btns.lKickFwd.addEventListener('click', () => setActionState('legL', 'kickFwd', 'lKickFwd'));
+        btns.lKickSide.addEventListener('click', () => setActionState('legL', 'kickSide', 'lKickSide'));
+        btns.lHalfKick.addEventListener('click', () => setActionState('legL', 'halfKick', 'lHalfKick'));
+        btns.rKickFwd.addEventListener('click', () => setActionState('legR', 'kickFwd', 'rKickFwd'));
+        btns.rKickSide.addEventListener('click', () => setActionState('legR', 'kickSide', 'rKickSide'));
+        btns.rHalfKick.addEventListener('click', () => setActionState('legR', 'halfKick', 'rHalfKick'));
+
+        function animate(t = 0) {
+            requestAnimationFrame(animate);
+            const dt = 0.016; 
+            if (isDancing) updateDanceLogic(t / 1000); 
+
+            const sliderVal = parseFloat(stateSlider.value); 
+            const nodVal = parseFloat(nodSlider.value);
+
+            let speed = 0; let armAmp = 0; let legAmp = 0; let bounceAmp = 0; let kneeBend = 0;
+            const isKicking = state.legL !== 'none' || state.legR !== 'none';
+            const isStepping = sideStepDir !== 0;
+            const moveMultiplier = (state.squat || jumpState !== 'none' || isKicking || isStepping || state.tpose) ? 0.0 : 1.0;
+
+            if (sliderVal <= 1) {
+                const blend = sliderVal; speed = THREE.MathUtils.lerp(1.5, 6, blend); armAmp = THREE.MathUtils.lerp(0.05, 0.6, blend); legAmp = THREE.MathUtils.lerp(0.0, 0.8, blend); bounceAmp = THREE.MathUtils.lerp(0.02, 0.1, blend); kneeBend = THREE.MathUtils.lerp(0, 0.5, blend);
+            } else {
+                const blend = sliderVal - 1; speed = THREE.MathUtils.lerp(6, 12, blend); armAmp = THREE.MathUtils.lerp(0.6, 1.2, blend); legAmp = THREE.MathUtils.lerp(0.8, 1.4, blend); bounceAmp = THREE.MathUtils.lerp(0.1, 0.2, blend); kneeBend = THREE.MathUtils.lerp(0.5, 1.2, blend);
+            }
+
+            if (isDancing) {
+                const complexity = parseFloat(danceComplexityInput.value);
+                speed *= (1.0 + currentEnergy * 2.0 + complexity * 3.0);
+            }
+
+            speed *= moveMultiplier; armAmp *= moveMultiplier; legAmp *= moveMultiplier; bounceAmp *= moveMultiplier;
+            simTime += speed * dt;
+            
+            let lLegAngle = Math.sin(simTime) * legAmp; let rLegAngle = Math.sin(simTime + Math.PI) * legAmp;
+            const lKneePhase = Math.sin(simTime - Math.PI/2); let lKneeAngle = (lKneePhase > 0 ? lKneePhase * kneeBend : 0);
+            const rKneePhase = Math.sin(simTime + Math.PI - Math.PI/2); let rKneeAngle = (rKneePhase > 0 ? rKneePhase * kneeBend : 0);
+            let lLegSide = 0; let rLegSide = 0; 
+            let lArmAngle = Math.sin(simTime + Math.PI) * armAmp; let rArmAngle = Math.sin(simTime) * armAmp;
+            let lElbowAngle = -0.5 - Math.abs(Math.sin(simTime + Math.PI)) * 0.5 * (sliderVal/2); let rElbowAngle = -0.5 - Math.abs(Math.sin(simTime)) * 0.5 * (sliderVal/2);
+            let lShoulderZ = 0.1; let rShoulderZ = -0.1; let lShoulderY = 0; let rShoulderY = 0;
+
+            let targetBaseY = BASE_HIP_HEIGHT; let targetHipsX = 0; let targetTorsoLean = sliderVal * 0.2; let targetSwayRotY = 0; let targetSpineRotZ = 0; let targetHeadRotY = 0;
+
+            if (state.tpose) {
+                targetBaseY = BASE_HIP_HEIGHT; targetHipsX = 0; targetTorsoLean = 0;
+                lLegAngle = 0; rLegAngle = 0; lKneeAngle = 0; rKneeAngle = 0; lLegSide = 0; rLegSide = 0;
+                lArmAngle = 0; rArmAngle = 0; lElbowAngle = 0; rElbowAngle = 0; lShoulderZ = Math.PI / 2; rShoulderZ = -Math.PI / 2; 
+            } else if (jumpState !== 'none') {
+                if (jumpState === 'anticipate') {
+                    jumpTimer += dt; const progress = Math.min(jumpTimer / 0.2, 1.0);
+                    targetBaseY = THREE.MathUtils.lerp(BASE_HIP_HEIGHT, 1.5, progress);
+                    const squatAngle = THREE.MathUtils.lerp(0, -1.2, progress); const kneeAngle = THREE.MathUtils.lerp(0, 2.4, progress);
+                    lLegAngle = squatAngle; rLegAngle = squatAngle; lKneeAngle = kneeAngle; rKneeAngle = kneeAngle; lArmAngle = 0.5; rArmAngle = 0.5;
+                    if (jumpTimer > 0.2) { jumpState = 'air'; jumpVelocity = JUMP_FORCE; }
+                } else if (jumpState === 'air') {
+                    jumpVelocity -= GRAVITY; hips.position.y += jumpVelocity;
+                    lLegAngle = 0.2; rLegAngle = -0.2; lKneeAngle = 0.1; rKneeAngle = 0.1; lArmAngle = -2.5; rArmAngle = -2.5;
+                    if (hips.position.y <= BASE_HIP_HEIGHT && jumpVelocity < 0) { hips.position.y = BASE_HIP_HEIGHT; jumpState = 'land'; jumpTimer = 0; jumpVelocity = 0; } else { targetBaseY = hips.position.y; }
+                } else if (jumpState === 'land') {
+                    jumpTimer += dt; const progress = Math.min(jumpTimer / 0.3, 1.0);
+                    const impactFactor = 1.0 - Math.sin(progress * Math.PI / 2); 
+                    targetBaseY = BASE_HIP_HEIGHT - (0.8 * impactFactor);
+                    const squatAdd = -1.2 * impactFactor; const kneeAdd = 2.4 * impactFactor;
+                    lLegAngle = squatAdd; rLegAngle = squatAdd; lKneeAngle = kneeAdd; rKneeAngle = kneeAdd; lArmAngle = -0.5 * impactFactor; rArmAngle = -0.5 * impactFactor;
+                    if (jumpTimer > 0.3) jumpState = 'none';
+                }
+            } else if (isStepping) {
+                sideStepTimer += dt;
+                const reachAng = 0.6; 
+                if (sideStepTimer <= STEP_OUT_DUR) {
+                    let t = Math.sin((sideStepTimer / STEP_OUT_DUR) * Math.PI/2); targetHipsX = 0;
+                    if (sideStepDir === 1) { rLegSide = THREE.MathUtils.lerp(0, -reachAng, t); } else { lLegSide = THREE.MathUtils.lerp(0, reachAng, t); }
+                } else if (sideStepTimer <= STEP_OUT_DUR + STEP_SHIFT_DUR) {
+                    let t = 0.5 - 0.5 * Math.cos(((sideStepTimer - STEP_OUT_DUR) / STEP_SHIFT_DUR) * Math.PI);
+                    targetHipsX = THREE.MathUtils.lerp(0, sideStepDir * STEP_DIST, t);
+                    const fixedLegAngle = Math.asin((-targetHipsX * sideStepDir) / 2.2); 
+                    if (sideStepDir === 1) { rLegSide = THREE.MathUtils.lerp(-reachAng, 0, t); lLegSide = fixedLegAngle; } else { lLegSide = THREE.MathUtils.lerp(reachAng, 0, t); rLegSide = -fixedLegAngle; }
+                    targetBaseY = BASE_HIP_HEIGHT - Math.sin(t * Math.PI) * 0.15; targetSpineRotZ = -sideStepDir * 0.1 * Math.sin(t * Math.PI); 
+                } else if (sideStepTimer <= STEP_OUT_DUR + STEP_SHIFT_DUR + STEP_CLOSE_DUR) {
+                    let t = (sideStepTimer - (STEP_OUT_DUR + STEP_SHIFT_DUR)) / STEP_CLOSE_DUR; targetHipsX = sideStepDir * STEP_DIST;
+                    const fixedLegAngleStart = Math.asin(-STEP_DIST / 2.2);
+                    if (sideStepDir === 1) { lLegSide = THREE.MathUtils.lerp(fixedLegAngleStart, 0, t); lKneeAngle = Math.sin(t * Math.PI) * 0.8; } else { rLegSide = THREE.MathUtils.lerp(-fixedLegAngleStart, 0, t); rKneeAngle = Math.sin(t * Math.PI) * 0.8; }
+                } else if (sideStepTimer <= STEP_OUT_DUR + STEP_SHIFT_DUR + STEP_CLOSE_DUR + STEP_PAUSE_DUR) { targetHipsX = sideStepDir * STEP_DIST;
+                } else if (sideStepTimer <= 2*STEP_OUT_DUR + STEP_SHIFT_DUR + STEP_CLOSE_DUR + STEP_PAUSE_DUR) {
+                    targetHipsX = sideStepDir * STEP_DIST; let t = (sideStepTimer - (STEP_OUT_DUR + STEP_SHIFT_DUR + STEP_CLOSE_DUR + STEP_PAUSE_DUR)) / STEP_OUT_DUR;
+                    if (sideStepDir === 1) { lLegSide = THREE.MathUtils.lerp(0, reachAng, t); } else { rLegSide = THREE.MathUtils.lerp(0, -reachAng, t); }
+                } else if (sideStepTimer <= 2*STEP_OUT_DUR + 2*STEP_SHIFT_DUR + STEP_CLOSE_DUR + STEP_PAUSE_DUR) {
+                    let t = 0.5 - 0.5 * Math.cos(((sideStepTimer - (2*STEP_OUT_DUR + STEP_SHIFT_DUR + STEP_CLOSE_DUR + STEP_PAUSE_DUR)) / STEP_SHIFT_DUR) * Math.PI);
+                    targetHipsX = THREE.MathUtils.lerp(sideStepDir * STEP_DIST, 0, t);
+                    const fixedLegAngle = Math.asin(((sideStepDir * STEP_DIST) - targetHipsX) / 2.2); 
+                    if (sideStepDir === 1) { lLegSide = THREE.MathUtils.lerp(reachAng, 0, t); rLegSide = -fixedLegAngle; } else { rLegSide = THREE.MathUtils.lerp(-reachAng, 0, t); lLegSide = fixedLegAngle; }
+                    targetBaseY = BASE_HIP_HEIGHT - Math.sin(t * Math.PI) * 0.15; targetSpineRotZ = sideStepDir * 0.1 * Math.sin(t * Math.PI);
+                } else if (sideStepTimer <= 2*STEP_OUT_DUR + 2*STEP_SHIFT_DUR + 2*STEP_CLOSE_DUR + STEP_PAUSE_DUR) {
+                    targetHipsX = 0; let t = (sideStepTimer - (2*STEP_OUT_DUR + 2*STEP_SHIFT_DUR + STEP_CLOSE_DUR + STEP_PAUSE_DUR)) / STEP_CLOSE_DUR;
+                    const fixedLegAngleStart = Math.asin(STEP_DIST / 2.2);
+                    if (sideStepDir === 1) { rLegSide = THREE.MathUtils.lerp(-fixedLegAngleStart, 0, t); rKneeAngle = Math.sin(t * Math.PI) * 0.8; } else { lLegSide = THREE.MathUtils.lerp(fixedLegAngleStart, 0, t); lKneeAngle = Math.sin(t * Math.PI) * 0.8; }
+                } else { sideStepDir = 0; targetHipsX = 0; }
+            } else if (state.squat) {
+                targetBaseY = 1.1; targetTorsoLean = 0.05; lLegAngle = -1.3; rLegAngle = -1.3; lKneeAngle = 2.6; rKneeAngle = 2.6; leftLeg.foot.rotation.x = -1.3; rightLeg.foot.rotation.x = -1.3;
+                if (state.armL === 'none' && state.armR === 'none') { lArmAngle = -0.2; rArmAngle = -0.2; lElbowAngle = -0.1; rElbowAngle = -0.1; }
+            } else {
+                 leftLeg.foot.rotation.x = THREE.MathUtils.lerp(leftLeg.foot.rotation.x, 0, 0.1); rightLeg.foot.rotation.x = THREE.MathUtils.lerp(rightLeg.foot.rotation.x, 0, 0.1);
+            }
+
+            if (jumpState === 'none' && !state.squat && !isStepping && !state.tpose) {
+                if (state.legL === 'kickFwd') { lLegAngle = -1.6; lKneeAngle = 0.1; lLegSide = 0; targetBaseY = BASE_HIP_HEIGHT; } 
+                else if (state.legL === 'kickSide') { lLegAngle = 0; lKneeAngle = 0.1; lLegSide = 1.6; targetBaseY = BASE_HIP_HEIGHT; } 
+                else if (state.legL === 'halfKick') { lLegAngle = -1.6; lKneeAngle = 2.2; lLegSide = 0; targetBaseY = BASE_HIP_HEIGHT; }
+                if (state.legR === 'kickFwd') { rLegAngle = -1.6; rKneeAngle = 0.1; rLegSide = 0; targetBaseY = BASE_HIP_HEIGHT; } 
+                else if (state.legR === 'kickSide') { rLegAngle = 0; rKneeAngle = 0.1; rLegSide = -1.6; targetBaseY = BASE_HIP_HEIGHT; } 
+                else if (state.legR === 'halfKick') { rLegAngle = -1.6; rKneeAngle = 2.2; rLegSide = 0; targetBaseY = BASE_HIP_HEIGHT; }
+            }
+
+            if (!state.tpose) {
+                if (state.spin) { hips.rotation.y += 3.0 * dt; } 
+                else { if (Math.abs(hips.rotation.y) > 0.001) { hips.rotation.y = hips.rotation.y % (Math.PI * 2); hips.rotation.y = THREE.MathUtils.lerp(hips.rotation.y, 0, 0.1); } }
+                if (state.sway) { targetSwayRotY = Math.sin(simTime * 2.0) * 0.4; } 
+                else if (state.bendL) { targetSpineRotZ = 0.3; } else if (state.bendR) { targetSpineRotZ = -0.3; }
+                if (state.lookL) { targetHeadRotY = 0.8; } else if (state.lookR) { targetHeadRotY = -0.8; }
+            }
+
+            if (state.tpose) {
+                // Handled
+            } else if (state.clap) {
+                const clapFreq = 12; const clapAmp = 0.15; const clapMotion = Math.sin(simTime * clapFreq) * clapAmp;
+                lArmAngle = -0.5; rArmAngle = -0.5; lElbowAngle = -1.8; rElbowAngle = -1.8;
+                lShoulderY = -0.5 + clapMotion; rShoulderY = 0.5 - clapMotion; lShoulderZ = 0.2; rShoulderZ = -0.2;
+            } else {
+                if (state.armL === 'full') { lShoulderZ = THREE.MathUtils.lerp(leftArm.shoulder.rotation.z, Math.PI * 0.95, 0.2); lArmAngle = THREE.MathUtils.lerp(leftArm.upperArm.rotation.x, 0, 0.2); lElbowAngle = THREE.MathUtils.lerp(leftArm.lowerArm.rotation.x, 0, 0.2); } 
+                else if (state.armL === 'half') { lShoulderZ = THREE.MathUtils.lerp(leftArm.shoulder.rotation.z, Math.PI * 0.5, 0.2); lArmAngle = THREE.MathUtils.lerp(leftArm.upperArm.rotation.x, 0, 0.2); lElbowAngle = THREE.MathUtils.lerp(leftArm.lowerArm.rotation.x, -1.5, 0.2); } 
+                else if (state.armL === 'pointFwd') { lArmAngle = THREE.MathUtils.lerp(leftArm.upperArm.rotation.x, -1.57, 0.2); lElbowAngle = THREE.MathUtils.lerp(leftArm.lowerArm.rotation.x, 0, 0.2); lShoulderZ = THREE.MathUtils.lerp(leftArm.shoulder.rotation.z, 0.1, 0.2); } 
+                else if (state.armL === 'pointSide') { lShoulderZ = THREE.MathUtils.lerp(leftArm.shoulder.rotation.z, 1.57, 0.2); lArmAngle = THREE.MathUtils.lerp(leftArm.upperArm.rotation.x, 0, 0.2); lElbowAngle = THREE.MathUtils.lerp(leftArm.lowerArm.rotation.x, 0, 0.2); }
+
+                if (state.armR === 'full') { rShoulderZ = THREE.MathUtils.lerp(rightArm.shoulder.rotation.z, -Math.PI * 0.95, 0.2); rArmAngle = THREE.MathUtils.lerp(rightArm.upperArm.rotation.x, 0, 0.2); rElbowAngle = THREE.MathUtils.lerp(rightArm.lowerArm.rotation.x, 0, 0.2); } 
+                else if (state.armR === 'half') { rShoulderZ = THREE.MathUtils.lerp(rightArm.shoulder.rotation.z, -Math.PI * 0.5, 0.2); rArmAngle = THREE.MathUtils.lerp(rightArm.upperArm.rotation.x, 0, 0.2); rElbowAngle = THREE.MathUtils.lerp(rightArm.lowerArm.rotation.x, -1.5, 0.2); } 
+                else if (state.armR === 'pointFwd') { rArmAngle = THREE.MathUtils.lerp(rightArm.upperArm.rotation.x, -1.57, 0.2); rElbowAngle = THREE.MathUtils.lerp(rightArm.lowerArm.rotation.x, 0, 0.2); rShoulderZ = THREE.MathUtils.lerp(rightArm.shoulder.rotation.z, -0.1, 0.2); } 
+                else if (state.armR === 'pointSide') { rShoulderZ = THREE.MathUtils.lerp(rightArm.shoulder.rotation.z, -1.57, 0.2); rArmAngle = THREE.MathUtils.lerp(rightArm.upperArm.rotation.x, 0, 0.2); rElbowAngle = THREE.MathUtils.lerp(rightArm.lowerArm.rotation.x, 0, 0.2); }
+            }
+
+            if (jumpState !== 'air') { const walkBounce = Math.cos(simTime * 2) * bounceAmp; hips.position.y = THREE.MathUtils.lerp(hips.position.y, targetBaseY + walkBounce, 0.15); }
+            hips.position.x = targetHipsX;
+            hips.rotation.x = THREE.MathUtils.lerp(hips.rotation.x, targetTorsoLean, 0.1);
+            hipsVisual.rotation.y = THREE.MathUtils.lerp(hipsVisual.rotation.y, targetSwayRotY, 0.1);
+            spine.rotation.y = THREE.MathUtils.lerp(spine.rotation.y, targetSwayRotY, 0.1);
+            spine.rotation.z = THREE.MathUtils.lerp(spine.rotation.z, targetSpineRotZ, 0.1);
+
+            leftLeg.hipJoint.rotation.z = THREE.MathUtils.lerp(leftLeg.hipJoint.rotation.z, lLegSide, 0.15); leftLeg.upperLeg.rotation.x = THREE.MathUtils.lerp(leftLeg.upperLeg.rotation.x, lLegAngle, 0.2); leftLeg.lowerLeg.rotation.x = THREE.MathUtils.lerp(leftLeg.lowerLeg.rotation.x, lKneeAngle, 0.2);
+            rightLeg.hipJoint.rotation.z = THREE.MathUtils.lerp(rightLeg.hipJoint.rotation.z, rLegSide, 0.15); rightLeg.upperLeg.rotation.x = THREE.MathUtils.lerp(rightLeg.upperLeg.rotation.x, rLegAngle, 0.2); rightLeg.lowerLeg.rotation.x = THREE.MathUtils.lerp(rightLeg.lowerLeg.rotation.x, rKneeAngle, 0.2);
+
+            leftArm.upperArm.rotation.x = THREE.MathUtils.lerp(leftArm.upperArm.rotation.x, lArmAngle, 0.1); leftArm.lowerArm.rotation.x = THREE.MathUtils.lerp(leftArm.lowerArm.rotation.x, lElbowAngle, 0.1); leftArm.shoulder.rotation.z = THREE.MathUtils.lerp(leftArm.shoulder.rotation.z, lShoulderZ, 0.1);
+            leftArm.shoulder.rotation.y = THREE.MathUtils.lerp(leftArm.shoulder.rotation.y, lShoulderY, 0.1); rightArm.shoulder.rotation.y = THREE.MathUtils.lerp(rightArm.shoulder.rotation.y, rShoulderY, 0.1);
+            rightArm.upperArm.rotation.x = THREE.MathUtils.lerp(rightArm.upperArm.rotation.x, rArmAngle, 0.1); rightArm.lowerArm.rotation.x = THREE.MathUtils.lerp(rightArm.lowerArm.rotation.x, rElbowAngle, 0.1); rightArm.shoulder.rotation.z = THREE.MathUtils.lerp(rightArm.shoulder.rotation.z, rShoulderZ, 0.1);
+            
+            let targetHeadRotX = 0;
+            if (nodVal > 0.1 && !state.tpose) {
+                const nodFreq = THREE.MathUtils.lerp(2, 15, (nodVal / 2));
+                const nodAmp = THREE.MathUtils.lerp(0.1, 0.5, (nodVal / 2));
+                targetHeadRotX = Math.sin(simTime * nodFreq) * (nodAmp + currentEnergy * 0.2);
+            }
+            headGroup.rotation.x = THREE.MathUtils.lerp(headGroup.rotation.x, targetHeadRotX, 0.1);
+            headGroup.rotation.y = THREE.MathUtils.lerp(headGroup.rotation.y, targetHeadRotY, 0.1);
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>
