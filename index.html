@@ -1,35 +1,127 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Vibe Visualizer</title>
-  <link href='/style.css' rel='stylesheet'>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ViberDream - Vibe Coding Journey</title>
+    <style>
+        body {
+            background-color: #121212;
+            color: white;
+            font-family: sans-serif;
+            margin: 0;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 4em;
+            margin-bottom: 0;
+            text-align: center;
+        }
+
+        h2 {
+            font-family: 'Brush Script MT', cursive;
+            font-size: 2.5em;
+            margin-top: 0;
+            margin-bottom: 60px;
+            text-align: center;
+            font-weight: normal;
+        }
+
+        .container {
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        h3 {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            justify-items: center;
+        }
+
+        /* STYLING FOR THE CLICKABLE CARD */
+        .card {
+            background-color: #1e293b;
+            border-radius: 12px;
+            overflow: hidden;
+            width: 100%;
+            max-width: 350px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            text-decoration: none; /* Removes link underline */
+            display: block; /* Makes the link behave like a block */
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        /* Hover Effect: Lifts up slightly */
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+        }
+
+        .card img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            display: block;
+        }
+
+        .button-label {
+            display: block;
+            width: 100%;
+            padding: 15px 0;
+            background-color: #2b4c6b;
+            color: white;
+            text-align: center;
+            font-size: 1.1em;
+            font-weight: bold;
+            border-bottom-left-radius: 12px;
+            border-bottom-right-radius: 12px;
+            transition: background-color 0.3s;
+        }
+
+        .card:hover .button-label {
+            background-color: #365d82; /* Lighter blue on hover */
+        }
+    </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Vibe Visualizer</h1>
-    <div class="card-container">
-      <div class="card">
-        <a href="Mannequin.html" target="_blank">
-          <div class="thumbnail"></div>
-          <h2>Mannequin</h2>
-        </a>
-      </div>
-      <div class="card">
-        <a href="Sonic_City.html" target="_blank">
-          <div class="thumbnail"></div>
-          <h2>Sonic City</h2>
-        </a>
-      </div>
-      <div class="card">
-        <a href="Space_swarm.html" target="_blank">
-          <div class="thumbnail"></div>
-          <h2>Space Swarm</h2>
-        </a>
-      </div>
+
+    <header>
+        <h1>ViberDream</h1>
+        <h2>Vibe Coding Journey</h2>
+    </header>
+
+    <div class="container">
+        <h3>Music Visualizer</h3>
+        <div class="grid">
+            
+            <a href="Apps/Sonic_City/index.html" target="_blank" class="card">
+                <img src="Apps/Sonic_City/img/Sonic+City_Thumbnail.jpg" alt="Sonic City">
+                <span class="button-label">Sonic City</span>
+            </a>
+
+            <a href="Apps/Mannequin/index.html" target="_blank" class="card">
+                <img src="Apps/Mannequin/img/Mannequin_Thumbnail.jpg" alt="Puppet Dance">
+                <span class="button-label">Mannequin</span>
+            </a>
+
+            <a href="Apps/SpaceSwarm/index.html" target="_blank" class="card">
+                <img src="Apps/SpaceSwarm/img/SwarmStars_Thumbnail.jpg" alt="Space Swarm">
+                <span class="button-label">Space Swarm</span>
+            </a>
+
+        </div>
     </div>
-  </div>
-  <script defer type="text/javascript" src="/main.js"></script>
+
 </body>
 </html>
